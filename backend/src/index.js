@@ -8,17 +8,26 @@ const fs = require('fs');
 
 const app = express();
 
-// Ensure uploads directory exists
+// Ensure uploads directory exists (skip on Vercel — read-only filesystem)
 const uploadsDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+if (process.env.NODE_ENV !== 'production') {
+  try {
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+  } catch (e) {
+    console.warn('Could not create uploads dir:', e.message);
+  }
 }
 
 // Middleware
 app.use(cors({ origin: process.env.FRONTEND_URL || '*', credentials: true }));
 app.use(express.json());
 app.use(morgan('dev'));
-app.use('/uploads', express.static(uploadsDir));
+// Serve uploads locally only (Vercel filesystem is read-only)
+if (process.env.NODE_ENV !== 'production') {
+  app.use('/uploads', express.static(uploadsDir));
+}
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
