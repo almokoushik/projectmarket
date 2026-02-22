@@ -38,14 +38,29 @@ app.use((err, req, res, next) => {
 
 // Connect DB and start
 const PORT = process.env.PORT || 5000;
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/ProjectMarket')
-  .then(() => {
-    console.log('MongoDB connected');
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-  })
-  .catch(err => {
-    console.error('DB connection failed:', err);
-    process.exit(1);
-  });
+
+// Cache connection across serverless invocations
+let isConnected = false;
+const connectDB = async () => {
+  if (isConnected) return;
+  await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/ProjectMarket');
+  isConnected = true;
+  console.log('MongoDB connected');
+};
+
+if (process.env.NODE_ENV !== 'production') {
+  // Local development: start the server normally
+  connectDB()
+    .then(() => {
+      app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    })
+    .catch(err => {
+      console.error('DB connection failed:', err);
+      process.exit(1);
+    });
+} else {
+  // Vercel serverless: connect on cold start, export handler
+  connectDB().catch(console.error);
+}
 
 module.exports = app;
